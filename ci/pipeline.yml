@@ -1,0 +1,121 @@
+---
+
+resource_types:
+  - name: registry-tag
+    type: registry-image
+    source:
+      repository: tlwr/registry-tag-resource
+      tag: 1593696431
+
+resources:
+  - name: golang-img-tag
+    type: registry-tag
+    icon: tag
+    check_every: 15m
+    source:
+      uri: https://hub.docker.com/v2/repositories/library/golang
+      pages: 3
+      regexp: '^[0-9]+[.][0-9]+[.][0-9]+-alpine'
+      semver:
+        matcher: '>= 1.14'
+
+  - name: weather-exporter-src
+    type: git
+    icon: git
+    source:
+      uri: https://github.com/tlwr/weather-exporter.git
+      branch: main
+
+  - name: weather-exporter-img
+    type: registry-image
+    icon: docker
+    source:
+      repository: ghcr.io/tlwr/weather-exporter
+      username: ((docker-secrets.username))
+      password: ((docker-secrets.password))
+
+
+jobs:
+  - name: set-pipeline
+    serial: true
+    plan:
+      - get: weather-exporter-src
+        trigger: true
+
+      - set_pipeline: weather-exporter
+        file: weather-exporter-src/ci/pipeline.yml
+
+  - name: test
+    serial: true
+    public: true
+    plan:
+      - get: weather-exporter-src
+        passed: [set-pipeline]
+        trigger: true
+
+      - task: test
+        privileged: true
+        config:
+          platform: linux
+
+          image_resource:
+            type: registry-image
+            source:
+              repository: golang
+
+          inputs:
+            - name: weather-exporter-src
+              path: .
+
+          run:
+            path: go
+            args:
+              - test
+              - -v
+              - ./...
+              - -ginkgo.v
+
+  - name: build
+    serial: true
+    public: true
+    plan:
+      - get: weather-exporter-src
+        passed: [test]
+        trigger: true
+
+      - get: golang-img-tag
+        trigger: true
+
+      - load_var: golang-version
+        file: golang-img-tag/tag
+
+      - task: build-img
+        privileged: true
+        config:
+          platform: linux
+
+          image_resource:
+            type: registry-image
+            source:
+              repository: vito/oci-build-task
+              tag: 0.3.0
+
+          inputs:
+            - name: weather-exporter-src
+              path: .
+
+          outputs:
+            - name: image
+
+          params:
+            BUILD_ARG_golang_version: ((.:golang-version))
+
+          run:
+            path: build
+
+      - put: weather-exporter-img
+        params:
+          image: image/image.tar
+          additional_tags: weather-exporter-src/.git/ref
+        get_params:
+          skip_download: true
