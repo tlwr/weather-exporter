@@ -16,4 +16,4 @@ WORKDIR /app
 COPY --from=build /app/weather-exporter /usr/bin/weather-exporter
 COPY --from=build /etc/ssl/certs /etc/ssl/certs
 EXPOSE 8080
-ENTRYPOINT ["/usr/bin/weather"]
+ENTRYPOINT ["/usr/bin/weather-exporter"]
