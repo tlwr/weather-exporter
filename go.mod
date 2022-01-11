@@ -4,7 +4,7 @@ go 1.16
 
 require (
 	github.com/meatballhat/negroni-logrus v1.1.1
-	github.com/onsi/ginkgo v1.14.2
+	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.10.4
 	github.com/phyber/negroni-gzip v1.0.0
 	github.com/prometheus/client_golang v1.9.0
